@@ -552,6 +552,53 @@ static void autoResetPeak(void) {
 class AudioReactive : public Usermod {
 
   private:
+  
+  // mqtt
+  String mqttMicVolumeTopic;
+  bool mqttInitialized = false;
+
+
+  void _mqttInitialize()
+  {
+    mqttMicVolumeTopic = String(mqttDeviceTopic) + F("/micVolume");
+
+    _createMqttSensor(F("MicVolume"), mqttMicVolumeTopic, F(""), F("%"), F("mdi:microphone"));
+  }
+
+  // Create an MQTT Sensor for Home Assistant Discovery purposes, this includes a pointer to the topic that is published to in the Loop.
+  void _createMqttSensor(const String &name, const String &topic, const String &deviceClass, const String &unitOfMeasurement, const String &icon)
+  {
+    String t = String(F("homeassistant/sensor/")) + mqttClientID + F("/") + name + F("/config");
+    
+    StaticJsonDocument<600> doc;
+    
+    doc[F("name")] = name;
+    doc[F("state_topic")] = topic;
+    doc[F("unique_id")] = String(mqttClientID) + name;
+    if (unitOfMeasurement != "")
+      doc[F("unit_of_measurement")] = unitOfMeasurement;
+    if (deviceClass != "")
+      doc[F("device_class")] = deviceClass;
+    if (icon != "")
+      doc["icon"] = icon;
+    doc[F("expire_after")] = 1800;
+
+    JsonObject device = doc.createNestedObject(F("device")); // attach the sensor to the same device
+    device[F("name")] = serverDescription;
+    device[F("identifiers")] = "wled-sensor-" + String(mqttClientID);
+    device[F("manufacturer")] = F(WLED_BRAND);
+    device[F("model")] = F(WLED_PRODUCT_NAME);
+    device[F("sw_version")] = versionString;
+
+    String temp;
+    serializeJson(doc, temp);
+    DEBUG_PRINTLN(t);
+    DEBUG_PRINTLN(temp);
+
+    mqtt->publish(t.c_str(), 0, true, temp.c_str());
+  }
+
+
 #ifdef ARDUINO_ARCH_ESP32
 
     #ifndef AUDIOPIN
@@ -1402,7 +1449,6 @@ class AudioReactive : public Usermod {
         logAudio();
       }
       #endif
-
       // Info Page: keep max sample from last 5 seconds
 #ifdef ARDUINO_ARCH_ESP32
       if ((millis() -  sampleMaxTimer) > CYCLE_SAMPLEMAX) {
@@ -1433,6 +1479,25 @@ class AudioReactive : public Usermod {
 #endif
 
       fillAudioPalettes();
+
+#ifndef WLED_DISABLE_MQTT
+      if (WLED_MQTT_CONNECTED && enabled)
+      {
+        if (!mqttInitialized)
+        {
+          _mqttInitialize();
+          mqttInitialized = true;
+        }
+        static unsigned long lastUpdate = 0;
+        static double lastMicVolume = 0;
+        if (millis() - lastUpdate > 5 * 1000 && fabs(micLev - lastMicVolume) > 2.0 )
+        {
+          mqtt->publish(mqttMicVolumeTopic.c_str(), 0, true, String((int)round(micLev)).c_str());
+          lastUpdate = millis();
+          lastMicVolume = micLev;
+        }
+      }
+#endif
     }
 
 
