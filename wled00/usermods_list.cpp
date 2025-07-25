@@ -242,6 +242,10 @@
 #include "../usermods/LD2410_v2/usermod_ld2410.h"
 #endif
 
+#ifdef IR_LED
+#include "../usermods/mqtt_ir/mqtt_ir_v2.h"
+#endif
+
 void registerUsermods()
 {
 /*
@@ -249,7 +253,10 @@ void registerUsermods()
    * || || ||
    * \/ \/ \/
    */
-  //UsermodManager::add(new MyExampleUsermod());
+
+  #ifdef IR_LED
+  UsermodManager::add(new MqttIR());
+  #endif
 
   #ifdef USERMOD_BATTERY
   UsermodManager::add(new UsermodBattery());
