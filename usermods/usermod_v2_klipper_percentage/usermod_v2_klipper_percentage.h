@@ -6,7 +6,7 @@ class klipper_percentage : public Usermod
 {
 private:
   unsigned long lastTime = 0;
-  String ip = F("0.0.0.0");
+  String ip = "0.0.0.0";
   WiFiClient wifiClient;
   char errorMessage[100] = "";
   int printPercent = 0;
